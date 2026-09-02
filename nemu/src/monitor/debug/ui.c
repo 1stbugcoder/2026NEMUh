@@ -4,7 +4,6 @@
 #include "nemu.h"
 
 #include <stdlib.h>
-#include <ctype.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -153,56 +152,39 @@ static int cmd_x(char *args) {
 
 	int i;
 	for (i = 0; i < count; i++) {
-		uint32_t val;
-
 		if (i % per_line == 0) {
 			printf("0x%08x:  ", addr);
 		}
-
-		/* 'g' (8 bytes) is not supported by swaddr_read() in the DEBUG
-		 * build (it only accepts 1/2/4). Read it as two 4-byte halves. */
-		if (width == 8) {
-			uint32_t lo = swaddr_read(addr, 4);
-			uint32_t hi = swaddr_read(addr + 4, 4);
-			switch (fmt) {
-				case 'd': printf("%20lld ", (long long)((int64_t)hi << 32 | lo)); break;
-				case 'u': printf("%20llu ", (unsigned long long)((uint64_t)hi << 32 | lo)); break;
-				default:  printf("%016llx ", (unsigned long long)((uint64_t)hi << 32 | lo)); break;
-			}
+		uint32_t val = swaddr_read(addr, width);
+		switch (fmt) {
+			case 'd':
+				switch (width) {
+					case 1: printf("%10d ", (int32_t)(int8_t)val); break;
+					case 2: printf("%10d ", (int32_t)(int16_t)val); break;
+					case 4: printf("%10d ", (int32_t)val); break;
+					default: printf("%10u ", val);
+				}
+				break;
+			case 'u':
+				switch (width) {
+					case 1: printf("%10u ", (uint8_t)val); break;
+					case 2: printf("%10u ", (uint16_t)val); break;
+					case 4: printf("%10u ", val); break;
+					default: printf("%10u ", val);
+				}
+				break;
+			case 'c':
+				printf("%c ", (val >= 32 && val < 127) ? val : '.');
+				break;
+			case 'x':
+			default:
+				switch (width) {
+					case 1: printf("%02x ", (uint8_t)val); break;
+					case 2: printf("%04x ", (uint16_t)val); break;
+					case 4: printf("%08x ", val); break;
+					default: printf("%08x ", val);
+				}
 		}
-		else {
-			val = swaddr_read(addr, width);
-			switch (fmt) {
-				case 'd':
-					switch (width) {
-						case 1: printf("%10d ", (int32_t)(int8_t)val); break;
-						case 2: printf("%10d ", (int32_t)(int16_t)val); break;
-						case 4: printf("%10d ", (int32_t)val); break;
-						default: printf("%10u ", val);
-					}
-					break;
-				case 'u':
-					switch (width) {
-						case 1: printf("%10u ", (uint8_t)val); break;
-						case 2: printf("%10u ", (uint16_t)val); break;
-						case 4: printf("%10u ", val); break;
-						default: printf("%10u ", val);
-					}
-					break;
-				case 'c':
-					printf("%c ", (val >= 32 && val < 127) ? val : '.');
-					break;
-				case 'x':
-				default:
-					switch (width) {
-						case 1: printf("%02x ", (uint8_t)val); break;
-						case 2: printf("%04x ", (uint16_t)val); break;
-						case 4: printf("%08x ", val); break;
-						default: printf("%08x ", val);
-					}
-			}
-		}
-
 		addr += width;
 		if ((i + 1) % per_line == 0) {
 			uint32_t line_start = addr - per_line * width;
