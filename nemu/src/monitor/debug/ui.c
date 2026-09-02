@@ -36,43 +36,33 @@ static int cmd_q(char *args) {
 	return -1;
 }
 
-/* skip leading spaces / tabs */
-static char* skip_ws(char *s) {
-	while (*s == ' ' || *s == '\t') {
-		s ++;
-	}
-	return s;
-}
-
-/* si [N]: single step N instructions (default N = 1) */
+/* si [N]: execute N instructions, where N defaults to 1 */
 static int cmd_si(char *args) {
 	int n = 1;
+	char *arg = strtok(NULL, " ");
 
-	if (args != NULL) {
-		char *end;
-		long v = strtol(args, &end, 10);
-		if (end == args || v <= 0) {
-			printf("si: usage: si [N]   (N must be a positive integer)\n");
+	if(arg != NULL) {
+		n = atoi(arg);
+		if(n <= 0) {
+			printf("Invalid step number '%s'\n", arg);
 			return 0;
 		}
-		n = (int)v;
 	}
 
 	cpu_exec(n);
 	return 0;
 }
 
-/* info r: print the registers */
+/* info r: print the values of the registers */
 static int cmd_info(char *args) {
-	if (args == NULL) {
-		printf("info: usage: info r   (print registers)\n");
+	char *sub = strtok(NULL, " ");
+
+	if(sub == NULL) {
+		printf("Usage: info r\n");
 		return 0;
 	}
 
-	char *sub = skip_ws(args);
-
-	if (strcmp(sub, "r") == 0) {
-		/* the format follows the experiment manual */
+	if(strcmp(sub, "r") == 0) {
 		printf("eax 0x%08x %u\n", cpu.eax, cpu.eax);
 		printf("ecx 0x%08x %u\n", cpu.ecx, cpu.ecx);
 		printf("edx 0x%08x %u\n", cpu.edx, cpu.edx);
@@ -83,48 +73,48 @@ static int cmd_info(char *args) {
 		printf("edi 0x%08x %u\n", cpu.edi, cpu.edi);
 	}
 	else {
-		printf("info: unknown subcommand '%s' (only 'info r' is supported now)\n", sub);
+		printf("Unknown info subcommand '%s'\n", sub);
 	}
+
 	return 0;
 }
 
-/* x N EXPR: print N consecutive 4-byte words in hexadecimal,
- * starting from the address EXPR.
- *
+/* x N EXPR: print N 4-byte words (in hex) starting from the address EXPR.
  * In this stage EXPR is simplified to be a hexadecimal number only,
  * e.g. "x 10 0x100000".
  */
 static int cmd_x(char *args) {
-	if (args == NULL) {
-		printf("x: usage: x N EXPR   (e.g. x 10 0x100000)\n");
+	char *arg1 = strtok(NULL, " ");
+	char *arg2 = strtok(NULL, " ");
+
+	if(arg1 == NULL || arg2 == NULL) {
+		printf("Usage: x N EXPR   (e.g. x 10 0x100000)\n");
 		return 0;
 	}
 
-	int n;
-	uint32_t addr;
-	if (sscanf(args, "%d %x", &n, &addr) != 2) {
-		printf("x: usage: x N EXPR   (e.g. x 10 0x100000)\n");
+	int n = atoi(arg1);
+	if(n <= 0) {
+		printf("Invalid number '%s'\n", arg1);
 		return 0;
 	}
-	if (n <= 0) {
-		printf("x: N must be a positive integer\n");
-		return 0;
-	}
+
+	uint32_t addr = (uint32_t)strtoul(arg2, NULL, 16);
 
 	int i;
-	for (i = 0; i < n; i ++) {
-		if (i % 4 == 0) {
+	for(i = 0; i < n; i ++) {
+		if(i % 4 == 0) {
 			printf("0x%08x: ", addr);
 		}
 		printf("0x%08x", swaddr_read(addr, 4));
 		addr += 4;
-		if (i % 4 == 3 || i == n - 1) {
+		if(i % 4 == 3 || i == n - 1) {
 			printf("\n");
 		}
 		else {
 			printf(" ");
 		}
 	}
+
 	return 0;
 }
 
@@ -138,8 +128,8 @@ static struct {
 	{ "help", "Display informations about all supported commands", cmd_help },
 	{ "c", "Continue the execution of the program", cmd_c },
 	{ "q", "Exit NEMU", cmd_q },
-	{ "si", "si [N] - single step N instructions (default N = 1)", cmd_si },
-	{ "info", "info r - print the registers", cmd_info },
+	{ "si", "si [N] - execute N instructions (default N = 1)", cmd_si },
+	{ "info", "info r - print the values of the registers", cmd_info },
 	{ "x", "x N EXPR - print N 4-byte words in hex starting from EXPR", cmd_x },
 
 	/* TODO: Add more commands */
