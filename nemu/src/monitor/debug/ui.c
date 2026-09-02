@@ -4,6 +4,7 @@
 #include "nemu.h"
 
 #include <stdlib.h>
+#include <ctype.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -103,7 +104,9 @@ static int cmd_x(char *args) {
 	char *p = args;
 	while (*p == ' ' || *p == '\t') p++;
 
+	int gdb_style = 0;
 	if (*p == '/') {
+		gdb_style = 1;
 		p++;
 		char *q = p;
 		while (*q && *q != ' ' && *q != '\t') q++;
@@ -141,9 +144,35 @@ static int cmd_x(char *args) {
 	}
 
 	while (*p == ' ' || *p == '\t') p++;
-	char *end;
-	unsigned long v = strtoul(p, &end, 16);
-	addr = (uint32_t)v;
+
+	if (!gdb_style) {
+		/* Simplified format defined by the experiment document:
+		 *   x [N] ADDR    (N bytes from hex address ADDR)
+		 * e.g. x 10 0x100000
+		 */
+		int n = 0;
+		uint32_t a = 0;
+		if (sscanf(p, "%d %x", &n, &a) == 2) {
+			count = n;
+			addr = a;
+		}
+		else if (sscanf(p, "%x", &a) == 1) {
+			/* only an address is given: print 16 bytes from there */
+			count = 16;
+			addr = a;
+		}
+		else {
+			printf("x: usage: x [N] ADDR   (e.g. x 10 0x100000: print N bytes)\n");
+			return 0;
+		}
+		width = 1;
+		fmt = 'x';
+	}
+	else {
+		char *end;
+		unsigned long v = strtoul(p, &end, 16);
+		addr = (uint32_t)v;
+	}
 
 	if (count <= 0) count = 1;
 
@@ -234,7 +263,7 @@ static struct {
 	{ "q", "Exit NEMU", cmd_q },
 	{ "si", "Single step: si [N] - execute N instructions (default N=1)", cmd_si },
 	{ "info", "Print runtime information: info r - print registers", cmd_info },
-	{ "x", "Examine memory: x /[N][s][f] ADDR   s=b/h/w/g  f=x/d/u/c", cmd_x },
+	{ "x", "Examine memory: x [N] ADDR (N bytes, e.g. x 10 0x100000); or x /[N][s][f] ADDR", cmd_x },
 
 };
 
